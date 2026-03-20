@@ -1,6 +1,6 @@
 services:
   obsidian-redirect:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: obsidian-redirect
     restart: unless-stopped
     volumes:
@@ -10,18 +10,25 @@ services:
       - ./docker-entrypoint.sh:/docker-entrypoint.sh:ro
     entrypoint: ["/docker-entrypoint.sh"]
     command: ["nginx", "-g", "daemon off;"]
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - redirect-net
 
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2024.12.2
     container_name: obsidian-cloudflared
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
       - TUNNEL_TOKEN=${TUNNEL_TOKEN}
     depends_on:
-      - obsidian-redirect
+      obsidian-redirect:
+        condition: service_healthy
     networks:
       - redirect-net
 

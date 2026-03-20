@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
+import { App, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile } from "obsidian";
 
 // ---------------------------------------------------------------------------
 // Settings — data contract
@@ -10,7 +10,7 @@ interface PluginSettings {
 }
 
 const DEFAULT_SETTINGS: PluginSettings = {
-	baseUrl: "https://ObsidianLink.MycelialHost.net/v1/open",
+	baseUrl: "",
 	vaultName: "",
 };
 
@@ -18,14 +18,41 @@ const DEFAULT_SETTINGS: PluginSettings = {
 // Pure utility functions — no side effects, easily testable
 // ---------------------------------------------------------------------------
 
+/**
+ * Normalizes a user-provided base URL into the canonical redirect endpoint.
+ * Strips trailing slashes and appends /v1/open if not already present.
+ *
+ * Examples:
+ *   "https://link.example.com"           -> "https://link.example.com/v1/open"
+ *   "https://link.example.com/"          -> "https://link.example.com/v1/open"
+ *   "https://link.example.com/v1/open"   -> "https://link.example.com/v1/open"
+ *   "https://link.example.com/v1/open/"  -> "https://link.example.com/v1/open"
+ */
 function normalizeBaseUrl(input: string): string {
 	let url = input.trim().replace(/\/+$/, "");
-	if (!url.endsWith("/open")) {
+	if (!url.endsWith("/v1/open")) {
+		// Strip any partial path that doesn't match, then append canonical path
 		url = url.replace(/\/+$/, "") + "/v1/open";
 	}
 	return url;
 }
 
+/**
+ * Returns true if the input looks like a valid HTTP(S) URL.
+ */
+function isValidHttpUrl(input: string): boolean {
+	try {
+		const url = new URL(input);
+		return url.protocol === "http:" || url.protocol === "https:";
+	} catch (_e) {
+		return false;
+	}
+}
+
+/**
+ * Constructs the canonical redirect URL for a given file path.
+ * Format: {base}?vault={vault}&file={file}
+ */
 function buildRedirectUrl(settings: PluginSettings, filePath: string): string {
 	const base = normalizeBaseUrl(settings.baseUrl);
 	return `${base}?vault=${encodeURIComponent(settings.vaultName)}&file=${encodeURIComponent(filePath)}`;
@@ -36,14 +63,14 @@ function buildRedirectUrl(settings: PluginSettings, filePath: string): string {
 // ---------------------------------------------------------------------------
 
 export default class RedirectLinkPlugin extends Plugin {
-	settings: PluginSettings = DEFAULT_SETTINGS;
+	settings: PluginSettings = { ...DEFAULT_SETTINGS };
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
 
 		// File explorer context menu: "Copy Redirect Link"
 		this.registerEvent(
-			this.app.workspace.on("file-menu", (menu, file) => {
+			this.app.workspace.on("file-menu", (menu, file: TAbstractFile) => {
 				if (!(file instanceof TFile)) return;
 				menu.addItem((item) => {
 					item
@@ -71,17 +98,29 @@ export default class RedirectLinkPlugin extends Plugin {
 		this.addSettingTab(new RedirectLinkSettingTab(this.app, this));
 	}
 
+	async onunload(): Promise<void> {
+		// All registerEvent() calls are auto-cleaned by Obsidian.
+		// Explicit onunload ensures the lifecycle contract is complete.
+	}
+
 	async copyRedirectLink(file: TFile): Promise<void> {
-		if (!this.settings.vaultName) {
-			new Notice("Set your vault name in Redirect Link settings first.");
+		if (!this.settings.vaultName || this.settings.vaultName.trim() === "") {
+			new Notice("Set your vault name in Copy Redirect Link settings first.");
 			return;
 		}
+		if (!this.settings.baseUrl || !isValidHttpUrl(this.settings.baseUrl)) {
+			new Notice("Set a valid redirect server URL in Copy Redirect Link settings first.");
+			return;
+		}
+
 		const url = buildRedirectUrl(this.settings, file.path);
+
 		try {
 			await navigator.clipboard.writeText(url);
 			new Notice("Redirect link copied \u2713");
-		} catch (e) {
-			new Notice("Failed to copy link to clipboard.");
+		} catch (e: unknown) {
+			console.error("Clipboard write failed:", e);
+			new Notice("Failed to copy link \u2014 check browser clipboard permissions.");
 		}
 	}
 
@@ -110,12 +149,14 @@ class RedirectLinkSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
+		containerEl.createEl("h2", { text: "Copy Redirect Link" });
+
 		new Setting(containerEl)
 			.setName("Redirect server URL")
 			.setDesc("/v1/open is appended automatically if not present")
 			.addText((text) =>
 				text
-					.setPlaceholder("https://ObsidianLink.MycelialHost.net")
+					.setPlaceholder("https://link.example.com")
 					.setValue(this.plugin.settings.baseUrl)
 					.onChange(async (value) => {
 						this.plugin.settings.baseUrl = value;
@@ -142,25 +183,29 @@ class RedirectLinkSettingTab extends PluginSettingTab {
 
 		testSetting.addButton((button) =>
 			button.setButtonText("Test").onClick(async () => {
+				const baseUrl = this.plugin.settings.baseUrl;
+
+				if (!baseUrl || !isValidHttpUrl(baseUrl)) {
+					testSetting.setDesc("\u2717 Enter a valid URL first");
+					return;
+				}
+
 				button.setDisabled(true);
 				button.setButtonText("Testing...");
 
 				const controller = new AbortController();
-				const timeout = setTimeout(() => controller.abort(), 3000);
+				const timeout = setTimeout(() => controller.abort(), 5000);
 
 				try {
-					const testUrl =
-						normalizeBaseUrl(this.plugin.settings.baseUrl) +
-						"?vault=test&file=test";
-					await fetch(testUrl, {
-						signal: controller.signal,
-						mode: "no-cors",
-					});
+					const testUrl = normalizeBaseUrl(baseUrl) + "?vault=test&file=test";
+					await fetch(testUrl, { signal: controller.signal });
 					testSetting.setDesc("\u2713 Server reachable");
-				} catch (e) {
-					testSetting.setDesc(
-						"\u2717 Unreachable \u2014 check URL and Cloudflare tunnel status"
-					);
+				} catch (e: unknown) {
+					if (e instanceof DOMException && e.name === "AbortError") {
+						testSetting.setDesc("\u2717 Timed out \u2014 server may be down or URL incorrect");
+					} else {
+						testSetting.setDesc("\u2717 Unreachable \u2014 check URL and Cloudflare tunnel status");
+					}
 				} finally {
 					clearTimeout(timeout);
 					button.setDisabled(false);

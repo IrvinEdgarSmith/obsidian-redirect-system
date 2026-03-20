@@ -23,6 +23,9 @@
     #fallback a { color: #89b4fa; word-break: break-all; }
     #fallback p { margin-bottom: 0.5rem; color: #a6adc8; font-size: 0.9em; }
   </style>
+
+  <!-- Scheme injected by docker-entrypoint.sh BEFORE any JS executes -->
+  <script>window.HANDLER_SCHEME = "__HANDLER_SCHEME__";</script>
 </head>
 <body>
   <div class="container">
@@ -40,42 +43,54 @@
   </div>
 
   <script>
-    window.onload = function() {
-      var params = new URLSearchParams(window.location.search);
-      var vault = params.get('vault') || '';
-      var file = params.get('file') || '';
+    (function() {
+      "use strict";
 
-      if (!vault || !file) {
-        document.getElementById('error').style.display = 'block';
-        return;
+      function run() {
+        var params = new URLSearchParams(window.location.search);
+        var vault = params.get('vault');
+        var file = params.get('file');
+
+        if (!vault || !file || vault.trim() === '' || file.trim() === '') {
+          document.getElementById('error').style.display = 'block';
+          return;
+        }
+
+        var scheme = window.HANDLER_SCHEME || 'obsidian';
+
+        // Guard against un-injected placeholder
+        if (scheme === '__HANDLER_SCHEME__') {
+          scheme = 'obsidian';
+        }
+
+        var uri = scheme + '://open?vault=' + encodeURIComponent(vault) + '&file=' + encodeURIComponent(file);
+
+        // Hide the page immediately — clean UX
+        document.body.style.opacity = '0';
+
+        // Fire via hidden anchor — does NOT navigate the current tab
+        var a = document.createElement('a');
+        a.href = uri;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+
+        // Show fallback after 2s in case the browser blocked it
+        setTimeout(function() {
+          document.body.style.opacity = '1';
+          document.getElementById('fallback').style.display = 'block';
+          document.getElementById('fallback-link').href = uri;
+          document.getElementById('fallback-link').textContent = uri;
+        }, 2000);
       }
 
-      var scheme = window.HANDLER_SCHEME || 'obsidian';
-      var uri = scheme + '://open?vault=' + encodeURIComponent(vault) + '&file=' + encodeURIComponent(file);
-
-      // Hide the page immediately — clean UX
-      document.body.style.opacity = '0';
-
-      // Fire via hidden anchor — does NOT navigate the current tab
-      var a = document.createElement('a');
-      a.href = uri;
-      a.style.display = 'none';
-      document.body.appendChild(a);
-      a.click();
-
-      // Show fallback after 2s in case the browser blocked it
-      setTimeout(function() {
-        document.body.style.opacity = '1';
-        document.getElementById('fallback').style.display = 'block';
-        document.getElementById('fallback-link').href = uri;
-        document.getElementById('fallback-link').textContent = uri;
-      }, 2000);
-    };
-  </script>
-
-  <script>
-    // Injected by docker-entrypoint.sh at container startup
-    window.HANDLER_SCHEME = "__HANDLER_SCHEME__";
+      // Use DOMContentLoaded (fires earlier than window.onload)
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', run);
+      } else {
+        run();
+      }
+    })();
   </script>
 </body>
 </html>
