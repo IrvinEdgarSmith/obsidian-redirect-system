@@ -1,4 +1,4 @@
-import { App, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile } from "obsidian";
+import { App, Notice, Plugin, PluginSettingTab, Setting, TFile, debounce } from "obsidian";
 
 // ---------------------------------------------------------------------------
 // Settings — data contract
@@ -20,21 +20,29 @@ const DEFAULT_SETTINGS: PluginSettings = {
 
 /**
  * Normalizes a user-provided base URL into the canonical redirect endpoint.
- * Strips trailing slashes and appends /v1/open if not already present.
+ * Extracts the origin and appends /v1/open, unless already present.
  *
  * Examples:
- *   "https://link.example.com"           -> "https://link.example.com/v1/open"
- *   "https://link.example.com/"          -> "https://link.example.com/v1/open"
- *   "https://link.example.com/v1/open"   -> "https://link.example.com/v1/open"
- *   "https://link.example.com/v1/open/"  -> "https://link.example.com/v1/open"
+ *   "https://link.example.com"            -> "https://link.example.com/v1/open"
+ *   "https://link.example.com/"           -> "https://link.example.com/v1/open"
+ *   "https://link.example.com/v1/open"    -> "https://link.example.com/v1/open"
+ *   "https://link.example.com/v1/open/"   -> "https://link.example.com/v1/open"
+ *   "https://link.example.com/wrong/path" -> "https://link.example.com/v1/open"
  */
 function normalizeBaseUrl(input: string): string {
-	let url = input.trim().replace(/\/+$/, "");
-	if (!url.endsWith("/v1/open")) {
-		// Strip any partial path that doesn't match, then append canonical path
-		url = url.replace(/\/+$/, "") + "/v1/open";
+	const trimmed = input.trim().replace(/\/+$/, "");
+	// Already has the canonical path — pass through
+	if (trimmed.match(/\/v1\/open$/)) {
+		return trimmed;
 	}
-	return url;
+	// Parse to extract origin, discard any incorrect path
+	try {
+		const parsed = new URL(trimmed);
+		return parsed.origin + "/v1/open";
+	} catch (_e) {
+		// If URL parsing fails, best-effort append (validation catches bad URLs elsewhere)
+		return trimmed + "/v1/open";
+	}
 }
 
 /**
@@ -70,7 +78,7 @@ export default class RedirectLinkPlugin extends Plugin {
 
 		// File explorer context menu: "Copy Redirect Link"
 		this.registerEvent(
-			this.app.workspace.on("file-menu", (menu, file: TAbstractFile) => {
+			this.app.workspace.on("file-menu", (menu, file) => {
 				if (!(file instanceof TFile)) return;
 				menu.addItem((item) => {
 					item
@@ -139,6 +147,9 @@ export default class RedirectLinkPlugin extends Plugin {
 
 class RedirectLinkSettingTab extends PluginSettingTab {
 	plugin: RedirectLinkPlugin;
+	private debouncedSave = debounce(async () => {
+		await this.plugin.saveSettings();
+	}, 500, true);
 
 	constructor(app: App, plugin: RedirectLinkPlugin) {
 		super(app, plugin);
@@ -160,7 +171,7 @@ class RedirectLinkSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.baseUrl)
 					.onChange(async (value) => {
 						this.plugin.settings.baseUrl = value;
-						await this.plugin.saveSettings();
+						this.debouncedSave();
 					})
 			);
 
@@ -173,7 +184,7 @@ class RedirectLinkSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.vaultName)
 					.onChange(async (value) => {
 						this.plugin.settings.vaultName = value;
-						await this.plugin.saveSettings();
+						this.debouncedSave();
 					})
 			);
 

@@ -1,3 +1,5 @@
 .env
 config/*.token
 *.log
+*.swp
+*.swo

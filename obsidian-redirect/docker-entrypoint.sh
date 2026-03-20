@@ -11,8 +11,7 @@ CONFIG_PATH="/etc/obsidian-redirect/config/adapter.json"
 HTML_SRC="/usr/share/nginx/html"
 HTML_LIVE="/usr/share/nginx/html-live"
 
-# --- Install jq (lightweight JSON parser, ~1 MB on Alpine) ----------------
-apk add --no-cache jq >/dev/null 2>&1
+# jq is pre-installed in the Docker image (see Dockerfile)
 
 # --- Validate config file exists and is valid JSON ------------------------
 if [ ! -f "$CONFIG_PATH" ]; then
