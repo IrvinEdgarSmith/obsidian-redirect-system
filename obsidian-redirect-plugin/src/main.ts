@@ -80,7 +80,7 @@ export default class RedirectLinkPlugin extends Plugin {
 		try {
 			await navigator.clipboard.writeText(url);
 			new Notice("Redirect link copied \u2713");
-		} catch {
+		} catch (e) {
 			new Notice("Failed to copy link to clipboard.");
 		}
 	}
@@ -157,7 +157,7 @@ class RedirectLinkSettingTab extends PluginSettingTab {
 						mode: "no-cors",
 					});
 					testSetting.setDesc("\u2713 Server reachable");
-				} catch {
+				} catch (e) {
 					testSetting.setDesc(
 						"\u2717 Unreachable \u2014 check URL and Cloudflare tunnel status"
 					);
