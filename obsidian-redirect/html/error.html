@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Error — Obsidian Redirect</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container { text-align: center; max-width: 480px; padding: 2rem; }
+    h2 { color: #f38ba8; margin-bottom: 1rem; }
+    code { background: #313244; padding: 0.2em 0.5em; border-radius: 4px; font-size: 0.9em; }
+    p { margin-bottom: 0.75rem; line-height: 1.5; }
+    .muted { color: #a6adc8; font-size: 0.85em; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Missing vault or file parameter</h2>
+    <p>The redirect URL must include both <code>vault</code> and <code>file</code> query parameters.</p>
+    <p class="muted">Expected format:</p>
+    <p><code>/v1/open?vault=MyVault&amp;file=path%2Fto%2FNote</code></p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "handler": "obsidian",
+  "handlers": {
+    "obsidian": {
+      "scheme": "obsidian",
+      "description": "Standard Obsidian URI scheme"
+    },
+    "advanced-uri": {
+      "scheme": "obsidian",
+      "description": "obsidian-advanced-uri plugin — same scheme, extended params supported"
+    }
+  }
+}

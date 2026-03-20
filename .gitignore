@@ -1,0 +1,5 @@
+.env
+node_modules/
+main.js
+*.js.map
+*.log

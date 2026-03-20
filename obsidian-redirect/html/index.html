@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Opening in Obsidian...</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      transition: opacity 0.15s ease;
+    }
+    .container { text-align: center; max-width: 480px; padding: 2rem; }
+    #error, #fallback { display: none; }
+    #error { color: #f38ba8; }
+    #error code { background: #313244; padding: 0.2em 0.5em; border-radius: 4px; font-size: 0.9em; }
+    #fallback a { color: #89b4fa; word-break: break-all; }
+    #fallback p { margin-bottom: 0.5rem; color: #a6adc8; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="error">
+      <h2>Missing Parameters</h2>
+      <p>Both <code>vault</code> and <code>file</code> are required.</p>
+      <p style="margin-top: 1rem; font-size: 0.85em; color: #a6adc8;">
+        Expected: <code>/v1/open?vault=MyVault&amp;file=path%2Fto%2FNote</code>
+      </p>
+    </div>
+    <div id="fallback">
+      <p>If Obsidian didn't open, click the link below:</p>
+      <a id="fallback-link" href="#"></a>
+    </div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      var params = new URLSearchParams(window.location.search);
+      var vault = params.get('vault') || '';
+      var file = params.get('file') || '';
+
+      if (!vault || !file) {
+        document.getElementById('error').style.display = 'block';
+        return;
+      }
+
+      var scheme = window.HANDLER_SCHEME || 'obsidian';
+      var uri = scheme + '://open?vault=' + encodeURIComponent(vault) + '&file=' + encodeURIComponent(file);
+
+      // Hide the page immediately — clean UX
+      document.body.style.opacity = '0';
+
+      // Fire via hidden anchor — does NOT navigate the current tab
+      var a = document.createElement('a');
+      a.href = uri;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+
+      // Show fallback after 2s in case the browser blocked it
+      setTimeout(function() {
+        document.body.style.opacity = '1';
+        document.getElementById('fallback').style.display = 'block';
+        document.getElementById('fallback-link').href = uri;
+        document.getElementById('fallback-link').textContent = uri;
+      }, 2000);
+    };
+  </script>
+
+  <script>
+    // Injected by docker-entrypoint.sh at container startup
+    window.HANDLER_SCHEME = "__HANDLER_SCHEME__";
+  </script>
+</body>
+</html>
