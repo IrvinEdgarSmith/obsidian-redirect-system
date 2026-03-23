@@ -43,7 +43,7 @@ if ! echo "$SCHEME" | grep -qE '^[a-zA-Z][a-zA-Z0-9+.-]*$'; then
   exit 1
 fi
 
-echo "Adapter: handler=$HANDLER scheme=$SCHEME"
+echo "Adapter: handler=$HANDLER scheme=$SCHEME type=$HANDLER"
 
 # --- Copy HTML template to writable location (source mount is :ro) ---------
 if [ ! -d "$HTML_SRC" ]; then
@@ -54,12 +54,16 @@ fi
 rm -rf "$HTML_LIVE"
 cp -r "$HTML_SRC" "$HTML_LIVE"
 
-# --- Inject scheme into HTML template --------------------------------------
+# --- Inject scheme and handler type into HTML template ---------------------
 sed -i "s|__HANDLER_SCHEME__|${SCHEME}|g" "$HTML_LIVE/index.html"
+sed -i "s|__HANDLER_TYPE__|${HANDLER}|g" "$HTML_LIVE/index.html"
 
 # --- Verify injection succeeded --------------------------------------------
 if grep -q "__HANDLER_SCHEME__" "$HTML_LIVE/index.html"; then
   echo "WARN: Placeholder __HANDLER_SCHEME__ still present in index.html after injection"
+fi
+if grep -q "__HANDLER_TYPE__" "$HTML_LIVE/index.html"; then
+  echo "WARN: Placeholder __HANDLER_TYPE__ still present in index.html after injection"
 fi
 
 echo "Ready: serving from $HTML_LIVE with scheme=$SCHEME"

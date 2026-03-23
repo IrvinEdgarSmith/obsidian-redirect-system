@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "handler": "obsidian",
+  "handler": "advanced-uri",
   "handlers": {
     "obsidian": {
       "scheme": "obsidian",

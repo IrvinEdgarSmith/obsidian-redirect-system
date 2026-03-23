@@ -24,16 +24,19 @@
     #fallback p { margin-bottom: 0.5rem; color: #a6adc8; font-size: 0.9em; }
   </style>
 
-  <!-- Scheme injected by docker-entrypoint.sh BEFORE any JS executes -->
-  <script>window.HANDLER_SCHEME = "__HANDLER_SCHEME__";</script>
+  <!-- Injected by docker-entrypoint.sh BEFORE any JS executes -->
+  <script>
+    window.HANDLER_SCHEME = "__HANDLER_SCHEME__";
+    window.HANDLER_TYPE = "__HANDLER_TYPE__";
+  </script>
 </head>
 <body>
   <div class="container">
     <div id="error">
       <h2>Missing Parameters</h2>
-      <p>Both <code>vault</code> and <code>file</code> are required.</p>
+      <p>A <code>vault</code> and either <code>uid</code> or <code>file</code> are required.</p>
       <p style="margin-top: 1rem; font-size: 0.85em; color: #a6adc8;">
-        Expected: <code>/v1/open?vault=MyVault&amp;file=path%2Fto%2FNote</code>
+        Expected: <code>/v1/open?vault=MyVault&amp;uid=abc123&amp;file=path%2Fto%2FNote</code>
       </p>
     </div>
     <div id="fallback">
@@ -49,21 +52,38 @@
       function run() {
         var params = new URLSearchParams(window.location.search);
         var vault = params.get('vault');
+        var uid = params.get('uid');
         var file = params.get('file');
 
-        if (!vault || !file || vault.trim() === '' || file.trim() === '') {
+        // Need vault + at least one of uid or file
+        if (!vault || vault.trim() === '' || (!uid && !file) || (uid && uid.trim() === '' && (!file || file.trim() === ''))) {
           document.getElementById('error').style.display = 'block';
           return;
         }
 
         var scheme = window.HANDLER_SCHEME || 'obsidian';
+        var handler = window.HANDLER_TYPE || 'obsidian';
 
-        // Guard against un-injected placeholder
-        if (scheme === '__HANDLER_SCHEME__') {
-          scheme = 'obsidian';
+        // Guard against un-injected placeholders
+        if (scheme === '__HANDLER_SCHEME__') { scheme = 'obsidian'; }
+        if (handler === '__HANDLER_TYPE__') { handler = 'obsidian'; }
+
+        var uri;
+
+        if (uid && uid.trim() !== '' && handler === 'advanced-uri') {
+          // Advanced URI: use uid for rename-proof resolution
+          uri = scheme + '://advanced-uri?vault=' + encodeURIComponent(vault) + '&uid=' + encodeURIComponent(uid.trim());
+        } else if (uid && uid.trim() !== '') {
+          // Standard Obsidian with uid: fall back to file path (uid ignored by standard handler)
+          // Include file path so the link still works without Advanced URI
+          uri = scheme + '://open?vault=' + encodeURIComponent(vault);
+          if (file && file.trim() !== '') {
+            uri += '&file=' + encodeURIComponent(file.trim());
+          }
+        } else {
+          // Legacy: file-only link (no uid)
+          uri = scheme + '://open?vault=' + encodeURIComponent(vault) + '&file=' + encodeURIComponent(file.trim());
         }
-
-        var uri = scheme + '://open?vault=' + encodeURIComponent(vault) + '&file=' + encodeURIComponent(file);
 
         // Hide the page immediately — clean UX
         document.body.style.opacity = '0';
