@@ -23,13 +23,6 @@
     #fallback a { color: #89b4fa; word-break: break-all; }
     #fallback p { margin-bottom: 0.5rem; color: #a6adc8; font-size: 0.9em; }
   </style>
-
-  <!-- Injected by docker-entrypoint.sh BEFORE any JS executes -->
-  <script>
-    window.HANDLER_SCHEME = "__HANDLER_SCHEME__";
-    window.HANDLER_TYPE = "__HANDLER_TYPE__";
-    window.CONFIG_INJECTED = true;
-  </script>
 </head>
 <body>
   <div class="container">
@@ -57,32 +50,19 @@
         var file = params.get('file');
 
         // Need vault + at least one of uid or file
-        if (!vault || vault.trim() === '' || (!uid && !file) || (uid && uid.trim() === '' && (!file || file.trim() === ''))) {
+        if (!vault || vault.trim() === '' || (!uid && !file) ||
+            (uid && uid.trim() === '' && (!file || file.trim() === ''))) {
           document.getElementById('error').style.display = 'block';
           return;
         }
 
-        var scheme = window.HANDLER_SCHEME || 'obsidian';
-        var handler = window.HANDLER_TYPE || 'obsidian';
-
-        // Guard against un-injected placeholders (uses boolean flag — immune to sed replacement)
-        if (!window.CONFIG_INJECTED) { scheme = 'obsidian'; handler = 'obsidian'; }
-
-        var uri;
-
-        if (uid && uid.trim() !== '' && handler === 'advanced-uri') {
-          // Advanced URI: use uid for rename-proof resolution
-          uri = scheme + '://advanced-uri?vault=' + encodeURIComponent(vault) + '&uid=' + encodeURIComponent(uid.trim());
-        } else if (uid && uid.trim() !== '') {
-          // Standard Obsidian with uid: fall back to file path (uid ignored by standard handler)
-          // Include file path so the link still works without Advanced URI
-          uri = scheme + '://open?vault=' + encodeURIComponent(vault);
-          if (file && file.trim() !== '') {
-            uri += '&file=' + encodeURIComponent(file.trim());
-          }
-        } else {
-          // Legacy: file-only link (no uid)
-          uri = scheme + '://open?vault=' + encodeURIComponent(vault) + '&file=' + encodeURIComponent(file.trim());
+        // Build URI — always use our plugin's custom handler
+        var uri = 'obsidian://redirect-link?vault=' + encodeURIComponent(vault.trim());
+        if (uid && uid.trim() !== '') {
+          uri += '&uid=' + encodeURIComponent(uid.trim());
+        }
+        if (file && file.trim() !== '') {
+          uri += '&file=' + encodeURIComponent(file.trim());
         }
 
         // Hide the page immediately — clean UX
@@ -104,7 +84,6 @@
         }, 2000);
       }
 
-      // Use DOMContentLoaded (fires earlier than window.onload)
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', run);
       } else {
