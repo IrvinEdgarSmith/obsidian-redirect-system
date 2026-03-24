@@ -28,6 +28,7 @@
   <script>
     window.HANDLER_SCHEME = "__HANDLER_SCHEME__";
     window.HANDLER_TYPE = "__HANDLER_TYPE__";
+    window.CONFIG_INJECTED = true;
   </script>
 </head>
 <body>
@@ -64,9 +65,8 @@
         var scheme = window.HANDLER_SCHEME || 'obsidian';
         var handler = window.HANDLER_TYPE || 'obsidian';
 
-        // Guard against un-injected placeholders
-        if (scheme === '__HANDLER_SCHEME__') { scheme = 'obsidian'; }
-        if (handler === '__HANDLER_TYPE__') { handler = 'obsidian'; }
+        // Guard against un-injected placeholders (uses boolean flag — immune to sed replacement)
+        if (!window.CONFIG_INJECTED) { scheme = 'obsidian'; handler = 'obsidian'; }
 
         var uri;
 
